@@ -1,0 +1,113 @@
+#!/usr/bin/env python
+
+import argparse
+import glob
+import os
+from os import system, getcwd, listdir, walk
+from os.path import exists, isfile
+from datetime import datetime
+from path import Path
+
+def make_graph(input_str, output_fn, root_module, path_string):
+       # create graph picture
+       # TODO use pipes
+       system(f'python -m cProfile -o profile {input_str} && '  # profiling
+              f'gprof2dot -f pstats -p {path_string} -p {getcwd()} -e 0.05 -n 0.5 --root "{root_module}"  -o graph.dot profile && '  # graph
+              f'dot graph.dot -Tpng -o {output_fn}  && '  # export to png
+              f'rm profile graph.dot')  # delete everything except output
+
+
+def make_graph_all(input_str, output_fn):
+    # create graph picture
+    # TODO use pipes
+    system(f'python -m cProfile -o profile {input_str} && '  # profiling
+           f'gprof2dot -f pstats  -o graph.dot profile && '  # graph
+           f'dot graph.dot -Tpng -o {output_fn}  && '  # export to png
+           f'rm profile graph.dot')  # delete everything except output
+
+
+def _get_root_module_name(input_str_as_file_path):
+    line_no = _find_start_of_python(file_name=input_str_as_file_path)
+    return f"{script_stem}:{line_no}:<module>"
+
+
+def _find_start_of_python(file_name):
+    searching = True
+    counter = 0
+
+    with open(file_name, "r") as file:
+        while searching:
+            counter += 1
+            line = file.readline()
+
+            if _check(line):
+                searching = False
+    return counter
+
+def _check(line):
+    comment = line.strip().startswith("#")
+    space = True if (line.strip() == "\n") or (line == "\n") else False
+
+    global DOCSTRING_COUNTER
+
+    if line.strip().startswith('"""'):
+        DOCSTRING_COUNTER += 1
+        if line.strip().endswith('"""'):
+            DOCSTRING_COUNTER += 1
+
+    if DOCSTRING_COUNTER % 2 == 1:
+        return False
+    else:
+        if comment or space:
+            return False
+        else:
+            return True
+
+def _path_string(extra_modules):
+    top_lvl = [ f.split(".")[0] for f in glob.glob("*.py")]
+    dirs = [os.path.basename(os.path.dirname(d)) for d in glob.glob(f"{os.getcwd()}/*/")]
+    more = [str(Path(__import__(module).__file__).parent) for module in extra_modules] if extra_modules else []
+    modules = top_lvl + dirs + more
+    return " -p ".join(modules)
+
+
+
+if __name__== '__main__':
+       DOCSTRING_COUNTER = 0
+       # current time
+       time = str(datetime.now()).split('.')[0].split(' ')
+       time = '-'.join(time)[:-3]
+       # TODO enhance arparser
+       # CLI interface
+       parser = argparse.ArgumentParser(description='Enter file name. Use this script from project root. If the script consumes arguments, QUOTATION MARKS, i.e. "module name <arg1> <arg2>"')
+       parser.add_argument('fn', help='specify file', type=str)
+       parser.add_argument('-m', action='store_true', help='Enter a python module instead of a script. If the module consumes arguments, QUOTATION MARKS, i.e. "module name <arg1> <arg2>"')
+       parser.add_argument('-a', action='store_true',
+                           help='Create an unfiltered graph.')
+       parser.add_argument('-x', action='append', type=str, help='Enter external modules that will be shown')
+       args = parser.parse_args()
+       input_str = args.fn
+       # in case of a module profile, identify the scripts path
+       if args.m:
+           input_str_as_file_path = input_str.split(' ')[0] + '.py'
+       else:
+           input_str_as_file_path = input_str.split(' ')[0]
+       # --- prepare input for make_graph - function ---
+       entire_path = Path(getcwd()) / input_str_as_file_path
+       script_name, script_stem = str(entire_path.name), entire_path.stem
+       assert exists(entire_path), 'Input file not found.'
+       folder = input_str[:-len(script_name)-1]
+       path_string = _path_string(args.x)
+       root_module = _get_root_module_name(input_str_as_file_path)
+       output_fn = f'{entire_path.parent / script_name.split(".")[0]}-{time}.png'  # file name of output png
+       if args.m:
+           input_str = '-m ' + input_str
+       # --- call make_graph ---
+       if args.a:
+           make_graph_all(input_str,output_fn)
+       else:
+           make_graph(input_str, output_fn, root_module, path_string)
+       # Check if output exists
+       if isfile(output_fn):
+            print(f"Saved the project graph as {output_fn}")
+
