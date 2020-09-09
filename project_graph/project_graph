@@ -8,20 +8,20 @@ from os.path import exists, isfile
 from datetime import datetime
 from path import Path
 
-def make_graph(input_str, output_fn, root_module, path_string):
+def make_graph(input_str, output_fn, root_module, path_string, threshold):
        # create graph picture
        # TODO use pipes
        system(f'python -m cProfile -o profile {input_str} && '  # profiling
-              f'gprof2dot -f pstats -p {path_string} -p {getcwd()} -e 0.05 -n 0.5 --root "{root_module}"  -o graph.dot profile && '  # graph
+              f'gprof2dot -f pstats -p {path_string} -p {getcwd()} -e 0.05 -n {threshold} --root "{root_module}"  -o graph.dot profile && '  # graph
               f'dot graph.dot -Tpng -o {output_fn}  && '  # export to png
               f'rm profile graph.dot')  # delete everything except output
 
 
-def make_graph_all(input_str, output_fn):
+def make_graph_all(input_str, output_fn, threshold):
     # create graph picture
     # TODO use pipes
     system(f'python -m cProfile -o profile {input_str} && '  # profiling
-           f'gprof2dot -f pstats  -o graph.dot profile && '  # graph
+           f'gprof2dot -f pstats -n {threshold} -o graph.dot profile && '  # graph
            f'dot graph.dot -Tpng -o {output_fn}  && '  # export to png
            f'rm profile graph.dot')  # delete everything except output
 
@@ -83,7 +83,8 @@ if __name__== '__main__':
        parser.add_argument('fn', help='specify file', type=str)
        parser.add_argument('-a', action='store_true',
                            help='Create an unfiltered graph.')
-       parser.add_argument('-x', action='append', type=str, help='Enter external modules that will be shown')
+       parser.add_argument('-x', action='append', type=str, help='Enter external modules that will be included')
+       parser.add_argument('-m', default=1, type=float, help='Visibility threshold of functions, e.g. 1 means 1 percent time or more spent in the function in order to show up')
        args = parser.parse_args()
        input_str = args.fn
        # in case of a module profile, identify the scripts path
@@ -94,13 +95,14 @@ if __name__== '__main__':
        assert exists(entire_path), 'Input file not found.'
        folder = input_str[:-len(script_name)-1]
        path_string = _path_string(args.x)
+       threshold = args.m
        root_module = _get_root_module_name(input_str_as_file_path)
        output_fn = f'{entire_path.parent / script_name.split(".")[0]}-{time}.png'  # file name of output png
        # --- call make_graph ---
        if args.a:
-           make_graph_all(input_str,output_fn)
+           make_graph_all(input_str,output_fn, threshold)
        else:
-           make_graph(input_str, output_fn, root_module, path_string)
+           make_graph(input_str, output_fn, root_module, path_string, threshold)
        # Check if output exists
        if isfile(output_fn):
             print(f"Saved the project graph as {output_fn}")
