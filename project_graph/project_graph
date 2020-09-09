@@ -81,17 +81,13 @@ if __name__== '__main__':
        # CLI interface
        parser = argparse.ArgumentParser(description='Enter file name. Use this script from project root. If the script consumes arguments, QUOTATION MARKS, i.e. "module name <arg1> <arg2>"')
        parser.add_argument('fn', help='specify file', type=str)
-       parser.add_argument('-m', action='store_true', help='Enter a python module instead of a script. If the module consumes arguments, QUOTATION MARKS, i.e. "module name <arg1> <arg2>"')
        parser.add_argument('-a', action='store_true',
                            help='Create an unfiltered graph.')
        parser.add_argument('-x', action='append', type=str, help='Enter external modules that will be shown')
        args = parser.parse_args()
        input_str = args.fn
        # in case of a module profile, identify the scripts path
-       if args.m:
-           input_str_as_file_path = input_str.split(' ')[0] + '.py'
-       else:
-           input_str_as_file_path = input_str.split(' ')[0]
+       input_str_as_file_path = input_str.split(' ')[0]
        # --- prepare input for make_graph - function ---
        entire_path = Path(getcwd()) / input_str_as_file_path
        script_name, script_stem = str(entire_path.name), entire_path.stem
@@ -100,8 +96,6 @@ if __name__== '__main__':
        path_string = _path_string(args.x)
        root_module = _get_root_module_name(input_str_as_file_path)
        output_fn = f'{entire_path.parent / script_name.split(".")[0]}-{time}.png'  # file name of output png
-       if args.m:
-           input_str = '-m ' + input_str
        # --- call make_graph ---
        if args.a:
            make_graph_all(input_str,output_fn)
